@@ -1,17 +1,25 @@
 import csv
 from utility import (wideNumInStr, print_spliter, clear_screen)
+from settings import (SLEEP_TIME)
 import os
 import copy
 import time
 
-SLEEP_TIME = 0.7
-
 def prepare_item_list():
     '''
         Load data from ./data/.
+
+        return:
+            item_list: Dict that key is type of device, value is List of device of that type.
+                       Each item in List is a Dict that the same structure with ./data/ CSV file.
+            _sum: Total number of devices in item_list. Save this because of divided by type,
+                  we cannot easily access that length of item_list by len().
     '''
     global item_index
     def load_data(file, item_list):
+        '''
+            Load data by filename, and add into item_list.
+        '''
         global item_index   # cannot use item_index within with scope
         with open(file, newline='', encoding='utf-8') as csvfile:
             rows = csv.DictReader(csvfile)
@@ -24,12 +32,20 @@ def prepare_item_list():
                 # row['分類'] = _type
                 item_list[_type].append(row)
                 item_index += 1
+
+    def parse_filename(data_dir):
+        '''
+            Load filename from data_dir, and sort by the prefix number in filename.
+        '''
+        filenames = os.listdir(data_dir)
+        filenames.sort(key=lambda x: int(x.split()[0]))
+        return filenames
+
     item_list = {}
     item_index = 1
     data_dir = './data/'
-    for filename in ('1 燈頭.csv', '2 燈光配件.csv', '3 旗框、布類.csv', '4 場務、雜項.csv',
-        '5 燈腳、夾具.csv', '6 機身組合.csv', '7 額外加價（需搭配機身組合）.csv',
-        '8 攝影配件（單件）.csv', '9 收音器材.csv'):
+    filenames = parse_filename(data_dir)
+    for filename in filenames:
         load_data(data_dir + filename, item_list)
     _sum = 0
     for item in item_list.values():
@@ -65,7 +81,7 @@ def show_item_list(clear=True):
 def add_item():
     '''
         Command '2', add items into selected item list.
-        Press Ctrl+C to stop adding.
+        Enter q to stop adding.
     '''
     def find_and_insert_item(command):
         '''
@@ -75,44 +91,44 @@ def add_item():
             if command <= len(items):   # find the item
                 item = items[command - 1]
                 while 1:
+                    nums = input('請輸入數量(輸入q以取消加入品項)：')
+                    if nums == 'q': # Leave
+                        print('\n已取消加入品項')
+                        return
                     try:
-                        nums = int(input('請輸入數量：'))
-                        if nums > 0 and nums <= item['數量']:
+                        nums = int(nums)
+                        if nums > 0 and nums <= item['數量']:   # Success
                             new_item = copy.copy(item)
                             new_item['數量'] = nums
                             export_item_list.append(new_item)
                             export_item_index_set.add(new_item['項次'])
                             print(f'成功加入品項：{new_item["項次"]} {new_item["器材內容"]} {new_item["數量"]}個')
                             return
-                        elif nums == 0:
+                        elif nums == 0: # Error
                             print('【警告】輸入數量不可為0，請重新輸入！')
-                        else:
+                        else:   # Error
                             print('【警告】輸入數量大於庫存數量，請重新輸入！')
-                    except KeyboardInterrupt:
-                        ''' Ctrl+C中斷輸入. '''
-                        print('\n已取消加入品項')
-                        return
-                    except:
+                    except: # Error
                         print('【警告】只接受整數輸入，請重新輸入！')
             command -= len(items)
     while 1:
         clear_screen()
         print('【加入新品項】\n')
         print_item_list()
-        try:
-            command = int(input('輸入項次編號以加入新品項(按下Ctrl+C以停止加入)：'))
-            if command >= 1 and command <= item_list_sum and command not in export_item_index_set:
-                find_and_insert_item(command)
-            elif command < 1 or command > item_list_sum:
-                print('【警告】項次編號超出範圍，請重新輸入！')
-            elif command in export_item_index_set:
-                print('【警告】該品項已存在，請重新輸入或刪除原先品項！')
-            time.sleep(SLEEP_TIME)
-        except KeyboardInterrupt:
-            ''' Ctrl+C中斷迴圈. '''
+        command = input('輸入項次編號以加入新品項(輸入q以停止加入品項)：')
+        if command == 'q':  # Leave
             clear_screen()
             break
-        except:
+        try:
+            command = int(command)
+            if command >= 1 and command <= item_list_sum and command not in export_item_index_set:  # Success
+                find_and_insert_item(command)
+            elif command < 1 or command > item_list_sum:    # Error
+                print('【警告】項次編號超出範圍，請重新輸入！')
+            elif command in export_item_index_set:  # Error
+                print('【警告】該品項已存在，請重新輸入或刪除原先品項！')
+            time.sleep(SLEEP_TIME)
+        except: # Error
             print('【警告】只接受整數輸入，請重新輸入！')
             time.sleep(SLEEP_TIME)
 
@@ -125,22 +141,23 @@ def delete_item():
         clear_screen()
         print('【刪除品項】\n')
         show_item_list(clear=False)
+        command = input('請輸入欲刪除之品項編號(輸入q以停止刪除)：')
+        if command == 'q': # Leave
+            clear_screen()
+            break
         try:
-            command = int(input('請輸入欲刪除之品項編號(按下Ctrl+C以停止刪除)：'))
+            command = int(command)
             f = False
             for idx, item in enumerate(export_item_list):
-                if item['項次'] == command:
+                if item['項次'] == command: # Success
                     del export_item_list[idx]
+                    export_item_index_set.remove(item['項次'])
                     f = True
                     break
-            if not f:
+            if not f:   # Error
                 print('【警告】輸入品項編號不存在，請重新輸入！')
                 time.sleep(SLEEP_TIME)
-        except KeyboardInterrupt:
-            ''' Ctrl+C中斷迴圈. '''
-            clear_screen()
-            break 
-        except:
+        except: # Error
             print('【警告】只接受整數輸入，請重新輸入！')
             time.sleep(SLEEP_TIME)
 
@@ -157,7 +174,7 @@ def export_to_csv():
         writer.writerow(['項次', '器材內容', '數量', '器材編號', '未稅單價'])
         for item in export_item_list:
             writer.writerow(item.values())
-    print(f'已輸出檔案至./export/{filename}.csv，可繼續以目前器材清單繼續操作，或是清空器材清單以建立新的清單，或是結束程式\n')
+    print(f'已輸出檔案至./export/{filename}.csv，可繼續以目前器材清單繼續操作，或是以指令5清空器材清單以建立新的清單，或是以指令6結束程式\n')
 
 item_list, item_list_sum = prepare_item_list()
 command_list = {
@@ -188,7 +205,7 @@ while f:
             break
         try:
             command_list[command]()
-        except KeyError:
+        except KeyError:    # Error
             print('【警告】指令錯誤，請重新輸入！')
             time.sleep(SLEEP_TIME)
             clear_screen()
