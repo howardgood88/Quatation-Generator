@@ -38,6 +38,7 @@ def prepare_item_list():
             Load filename from data_dir, and sort by the prefix number in filename.
         '''
         filenames = os.listdir(data_dir)
+        filenames = [i for i in filenames if i.endswith('csv')] # for Mac
         filenames.sort(key=lambda x: int(x.split()[0]))
         return filenames
 
